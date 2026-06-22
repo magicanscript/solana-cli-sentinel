@@ -15,7 +15,9 @@ mod analysis;
 mod commands;
 mod config;
 mod error;
+mod llm;
 mod metrics;
+mod notify;
 mod utils;
 
 #[derive(Parser)]

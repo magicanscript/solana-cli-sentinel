@@ -42,8 +42,24 @@ Finished `dev` profile [unoptimized + debuginfo] target(s) in 5.38s
 
 ---
 
-## Фаза 3 — Нотификации (llm, notify) ⏳
-_Ожидает выполнения_
+## Фаза 3 — Нотификации (llm, notify) ✅
+**Дата:** 2026-06-22
+
+### Что сделано
+- `src/llm/mod.rs` — `LlmClient::generate_alert_text()`:
+  - POST к Mistral Chat Completions API (`mistral-small-latest`)
+  - Промпт на русском: URL ноды, дельта слотов, RTT, пороги → алерт ≤ 200 символов
+  - Парсинг `choices[0].message.content`; ошибки → `SentinelError::Llm`
+  - 4 unit-теста на построение промпта
+- `src/notify/mod.rs` — `TelegramClient::send_message()`:
+  - POST к Telegram Bot API (`sendMessage`, `parse_mode: HTML`)
+  - Проверка `ok: true`; ошибки → `SentinelError::Telegram`
+- `src/main.rs` — зарегистрированы модули `llm` и `notify`
+- Интеграционные тесты с `#[ignore]` (запуск: `cargo test <name> -- --ignored --nocapture`)
+
+### Результат живых тестов
+- **Mistral**: сгенерировал алерт: `"Срочно: отставание слотов -15 (порог 5), RTT 800мс (порог 500мс) на ноде http://my-node:8899. Проверить сеть, нагрузку, синхронизацию."`
+- **Telegram**: сообщение доставлено в чат `7874219393` (@heavenR1der / @magicanSol_bot)
 
 ---
 
