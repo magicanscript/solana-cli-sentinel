@@ -1,15 +1,15 @@
-/// Команда `watch` — демон непрерывного мониторинга Solana-ноды.
+/// The `watch` command — continuous Solana node monitoring daemon.
 ///
-/// Алгоритм:
-/// 1. Инициализирует LLM- и Telegram-клиенты один раз при старте
-/// 2. Немедленно выполняет первый опрос (tick)
-/// 3. Ждёт `poll_interval` через `tokio::select!`, который прерывается по Ctrl+C
-/// 4. При каждом тике: опрос → анализ → если нужен алерт и cooldown истёк → LLM → Telegram
+/// Algorithm:
+/// 1. Initialise LLM and Telegram clients once at startup
+/// 2. Execute the first probe immediately (tick)
+/// 3. Wait for `poll_interval` via `tokio::select!`, which is interrupted by Ctrl+C
+/// 4. On each tick: probe → analyse → if alert needed and cooldown elapsed → LLM → Telegram
 ///
-/// Cooldown предотвращает спам: если алерт уже отправлялся менее чем `alert_cooldown` назад,
-/// новый алерт подавляется с предупреждением в лог.
+/// Cooldown prevents spam: if an alert was sent less than `alert_cooldown` ago,
+/// the new alert is suppressed with a warning log.
 ///
-/// При ошибке опроса или отправки — логирует и продолжает цикл (демон не падает).
+/// On probe or send errors — logs and continues the loop (the daemon does not crash).
 use std::time::Instant;
 
 use anyhow::Result;
@@ -21,12 +21,12 @@ use crate::llm::LlmClient;
 use crate::metrics;
 use crate::notify::TelegramClient;
 
-/// Запускает бесконечный цикл мониторинга.
+/// Runs the infinite monitoring loop.
 ///
-/// Завершается только при получении Ctrl+C (SIGINT).
-/// Все ошибки внутри цикла обрабатываются локально — демон не паникует.
+/// Terminates only on Ctrl+C (SIGINT).
+/// All errors inside the loop are handled locally — the daemon does not panic.
 pub async fn run(cfg: Config) -> Result<()> {
-    info!("демон запущен: {}", cfg.summary());
+    info!("daemon started: {}", cfg.summary());
 
     let llm = LlmClient::new();
     let tg = TelegramClient::new();
@@ -36,13 +36,13 @@ pub async fn run(cfg: Config) -> Result<()> {
     loop {
         tick(&cfg, &llm, &tg, &mut last_alert_at).await;
 
-        // Ждём следующий тик или Ctrl+C.
-        // tokio::select! гарантирует, что сигнал обработается даже во время сна.
+        // Wait for the next tick or Ctrl+C.
+        // tokio::select! ensures the signal is handled even during sleep.
         tokio::select! {
             result = tokio::signal::ctrl_c() => {
                 match result {
-                    Ok(()) => info!("получен Ctrl+C, завершаю работу..."),
-                    Err(e) => error!("ошибка обработки сигнала: {e}"),
+                    Ok(()) => info!("received Ctrl+C, shutting down..."),
+                    Err(e) => error!("signal handler error: {e}"),
                 }
                 break;
             }
@@ -50,24 +50,24 @@ pub async fn run(cfg: Config) -> Result<()> {
         }
     }
 
-    info!("демон остановлен");
+    info!("daemon stopped");
     Ok(())
 }
 
-/// Один цикл опроса: probe → analyze → (опционально) alert.
+/// One probe cycle: probe → analyse → (optionally) alert.
 ///
-/// Ошибки логируются и не прерывают демон.
+/// Errors are logged and do not interrupt the daemon.
 async fn tick(
     cfg: &Config,
     llm: &LlmClient,
     tg: &TelegramClient,
     last_alert_at: &mut Option<Instant>,
 ) {
-    // Параллельный опрос обеих нод
+    // Probe both nodes in parallel
     let probe = match metrics::probe_both(cfg).await {
         Ok(p) => p,
         Err(e) => {
-            error!("ошибка опроса нод: {e}");
+            error!("node probe failed: {e}");
             return;
         }
     };
@@ -75,7 +75,7 @@ async fn tick(
     let analysis = analysis::analyze(&probe, cfg);
 
     info!(
-        "тик: delta={:+} target_rtt={}ms статус={}",
+        "tick: delta={:+} target_rtt={}ms status={}",
         analysis.slot_delta,
         analysis.target_rtt_ms,
         analysis.status_text(),
@@ -85,37 +85,37 @@ async fn tick(
         return;
     }
 
-    // Проверяем cooldown: не слать алерт повторно слишком часто
+    // Check cooldown: do not send alerts too frequently
     if let Some(last) = *last_alert_at {
         let elapsed = last.elapsed();
         if elapsed < cfg.alert_cooldown {
             let remaining = cfg.alert_cooldown.saturating_sub(elapsed);
             warn!(
-                "алерт подавлен cooldown: до следующего {}с",
+                "alert suppressed by cooldown: {}s until next",
                 remaining.as_secs()
             );
             return;
         }
     }
 
-    // Генерируем текст через LLM; при ошибке — фолбэк на базовый текст
+    // Generate alert text via LLM; fall back to a basic message on error
     let alert_text = match llm
         .generate_alert_text(&cfg.target_rpc_url, &analysis, cfg)
         .await
     {
         Ok(text) => text,
         Err(e) => {
-            error!("ошибка LLM: {e} — использую базовый текст алерта");
+            error!("LLM error: {e} — using fallback alert text");
             format!("ALERT {}: {}", cfg.target_rpc_url, analysis.status_text())
         }
     };
 
-    // Отправляем в Telegram
+    // Send to Telegram
     if let Err(e) = tg.send_message(&alert_text, cfg).await {
-        error!("ошибка отправки в Telegram: {e}");
+        error!("failed to send Telegram alert: {e}");
         return;
     }
 
     *last_alert_at = Some(Instant::now());
-    info!("алерт отправлен: {alert_text}");
+    info!("alert sent: {alert_text}");
 }

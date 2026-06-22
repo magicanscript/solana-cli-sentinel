@@ -1,20 +1,20 @@
-/// Утилиты общего назначения.
+/// General-purpose utilities.
 use std::future::Future;
 use std::time::Duration;
 
 use tracing::warn;
 
-/// Повторяет асинхронную операцию при ошибке с экспоненциальным backoff.
+/// Retries an async operation on failure with exponential backoff.
 ///
-/// Стратегия: до `max_attempts` попыток; задержки между ними: 1с, 2с, 4с, ...
-/// При исчерпании всех попыток возвращает последнюю ошибку без паники.
+/// Strategy: up to `max_attempts` attempts; delays between them: 1s, 2s, 4s, …
+/// On exhaustion returns the last error without panicking.
 ///
-/// # Аргументы
-/// * `label`        — метка операции для строк предупреждения в лог
-/// * `max_attempts` — общее число попыток (включая первую)
-/// * `op`           — фабрика Future: вызывается заново на каждой попытке
+/// # Arguments
+/// * `label`        — operation label used in warning log lines
+/// * `max_attempts` — total number of attempts (including the first)
+/// * `op`           — future factory: called anew on each attempt
 ///
-/// # Пример
+/// # Example
 /// ```ignore
 /// let slot = retry_async("get_slot", 3, || rpc.get_slot()).await?;
 /// ```
@@ -35,7 +35,7 @@ where
             Err(e) => {
                 if attempt < max_attempts {
                     warn!(
-                        "{label}: попытка {attempt}/{max_attempts} неудачна ({e}), повтор через {}с",
+                        "{label}: attempt {attempt}/{max_attempts} failed ({e}), retrying in {}s",
                         delay.as_secs()
                     );
                     tokio::time::sleep(delay).await;

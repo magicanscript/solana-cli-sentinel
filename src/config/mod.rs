@@ -1,82 +1,82 @@
-/// Конфигурация всего приложения.
+/// Application-wide configuration.
 ///
-/// Все параметры читаются из переменных окружения (или из файла `.env` через `dotenvy`).
-/// Нет CLI-флагов для настроек — только env, чтобы демон было удобно запускать
-/// через systemd/docker с переменными окружения.
+/// All parameters are read from environment variables (or from `.env` via `dotenvy`).
+/// There are no CLI flags for settings — only env vars, which makes it easy to run
+/// the daemon under systemd or Docker with environment-based configuration.
 use std::env;
 use std::time::Duration;
 
 use crate::error::SentinelError;
 
-/// Главная структура конфигурации.
-/// Создаётся один раз при старте через `Config::from_env()` и затем передаётся
-/// по ссылке во все модули.
+/// Main configuration structure.
+/// Created once at startup via `Config::from_env()` and then passed by reference
+/// to all modules that need it.
 #[derive(Debug, Clone)]
 pub struct Config {
     // --- Solana RPC ---
 
-    /// URL ноды, за которой ведётся наблюдение (обязательное поле).
-    /// Пример: "http://192.168.1.10:8899"
+    /// URL of the node being monitored (required).
+    /// Example: "http://192.168.1.10:8899"
     pub target_rpc_url: String,
 
-    /// URL эталонной ноды для сравнения слотов.
-    /// По умолчанию — официальная mainnet-beta.
+    /// URL of the reference node used for slot comparison.
+    /// Defaults to the official mainnet-beta endpoint.
     pub reference_rpc_url: String,
 
-    // --- Параметры polling ---
+    // --- Polling parameters ---
 
-    /// Интервал между опросами нод.
-    /// Читается из `SENTINEL_POLL_INTERVAL_SECS`, по умолчанию 10 секунд.
+    /// Interval between node polls.
+    /// Read from `SENTINEL_POLL_INTERVAL_SECS`, default 10 seconds.
     pub poll_interval: Duration,
 
-    // --- Пороги для алертов ---
+    // --- Alert thresholds ---
 
-    /// Максимально допустимое отставание target-ноды от reference в слотах.
-    /// Если `reference_slot - target_slot > slot_lag_threshold` → алерт.
+    /// Maximum allowed slot lag of the target node behind the reference.
+    /// If `reference_slot - target_slot > slot_lag_threshold` → alert.
     pub slot_lag_threshold: u64,
 
-    /// Максимально допустимое время ответа target-ноды в миллисекундах.
-    /// Если RTT > rtt_threshold_ms → алерт.
+    /// Maximum allowed response time of the target node in milliseconds.
+    /// If RTT > rtt_threshold_ms → alert.
     pub rtt_threshold_ms: u64,
 
-    /// Минимальный интервал между двумя алертами (cooldown).
-    /// Предотвращает спам в Telegram при затяжной проблеме.
+    /// Minimum interval between two consecutive alerts (cooldown).
+    /// Prevents Telegram spam during a prolonged incident.
     pub alert_cooldown: Duration,
 
     // --- Mistral LLM ---
 
-    /// Секретный ключ Mistral API. Обязательное поле.
-    /// Читается из `MISTRAL_API_KEY`.
+    /// Mistral API secret key. Required.
+    /// Read from `MISTRAL_API_KEY`.
     pub mistral_api_key: String,
 
-    /// ID модели для генерации алертов.
-    /// Читается из `MISTRAL_MODEL`, по умолчанию "mistral-small-latest".
+    /// Model ID used for alert generation.
+    /// Read from `MISTRAL_MODEL`, default "mistral-small-latest".
     pub mistral_model: String,
 
     // --- Telegram ---
 
-    /// Токен Telegram-бота (формат: "123456:ABC-DEF..."). Обязательное поле.
+    /// Telegram bot token (format: "123456:ABC-DEF..."). Required.
     pub telegram_bot_token: String,
 
-    /// ID чата или канала для отправки алертов (например, "-1001234567890"). Обязательное поле.
+    /// Chat or channel ID to send alerts to (e.g. "-1001234567890"). Required.
     pub telegram_chat_id: String,
 }
 
 impl Config {
-    /// Читает все параметры из переменных окружения.
+    /// Reads all parameters from environment variables.
     ///
-    /// Обязательные переменные: `SOLANA_TARGET_RPC_URL`, `ANTHROPIC_API_KEY`,
+    /// Required variables: `SOLANA_TARGET_RPC_URL`, `MISTRAL_API_KEY`,
     /// `TELEGRAM_BOT_TOKEN`, `TELEGRAM_CHAT_ID`.
-    /// Если хотя бы одна отсутствует — возвращает `Err(SentinelError::Config)`.
+    /// If any of them is absent — returns `Err(SentinelError::Config)`.
     ///
-    /// Остальные переменные опциональны и имеют значения по умолчанию.
+    /// All other variables are optional and have sensible defaults.
     pub fn from_env() -> Result<Self, SentinelError> {
         Ok(Self {
-            // Обязательные поля: используем вспомогательную функцию require_var(),
-            // которая возвращает ошибку с понятным сообщением если переменная не задана.
+            // Required fields: use the helper require_var() which returns a descriptive
+            // error message if the variable is missing.
             target_rpc_url: require_var("SOLANA_TARGET_RPC_URL")?,
 
-            // Опциональные поля: используем unwrap_or_else() для задания дефолта.
+            // Optional fields: use unwrap_or_else() to supply defaults.
             reference_rpc_url: env::var("SOLANA_REFERENCE_RPC_URL")
                 .unwrap_or_else(|_| "https://api.mainnet-beta.solana.com".to_string()),
 
@@ -103,8 +103,8 @@ impl Config {
         })
     }
 
-    /// Возвращает строку с обзором конфигурации для логирования при старте демона.
-    /// API-ключи маскируются — в лог попадает только первые 8 символов.
+    /// Returns a human-readable summary of the current configuration for startup logging.
+    /// API keys are masked — only the first 8 characters are shown.
     pub fn summary(&self) -> String {
         format!(
             "target={} reference={} interval={:?} slot_lag_threshold={} rtt_threshold_ms={}ms cooldown={:?} model={}",
@@ -119,8 +119,8 @@ impl Config {
     }
 }
 
-/// Читает обязательную env-переменную.
-/// Возвращает `SentinelError::Config` с именем переменной если она не задана.
+/// Reads a required env variable.
+/// Returns `SentinelError::Config` with the variable name if it is not set.
 fn require_var(name: &str) -> Result<String, SentinelError> {
     env::var(name).map_err(|_| {
         SentinelError::Config(format!(
@@ -129,14 +129,14 @@ fn require_var(name: &str) -> Result<String, SentinelError> {
     })
 }
 
-/// Читает числовую env-переменную типа u64.
-/// Если переменная не задана — возвращает `default`.
-/// Если задана, но не парсится как число — возвращает `SentinelError::Config`.
+/// Reads a numeric env variable of type u64.
+/// Returns `default` if the variable is not set.
+/// Returns `SentinelError::Config` if the variable is set but cannot be parsed as a number.
 fn parse_u64_var(name: &str, default: u64) -> Result<u64, SentinelError> {
     match env::var(name) {
-        // Переменная не задана — используем дефолт, ошибки нет
+        // Variable not set — use default, no error
         Err(_) => Ok(default),
-        // Переменная задана — пробуем распарсить
+        // Variable set — try to parse it as u64
         Ok(val) => val.parse::<u64>().map_err(|_| {
             SentinelError::Config(format!(
                 "переменная '{name}' должна быть числом, получено: '{val}'"
