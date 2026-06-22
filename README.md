@@ -4,11 +4,6 @@
 ![Solana](https://img.shields.io/badge/Solana-mainnet--beta-9945FF?logo=solana)
 ![Mistral](https://img.shields.io/badge/LLM-Mistral_AI-blue)
 
-A CLI daemon that monitors a Solana validator node, detects slot lag and high RTT, generates human-readable alerts via the Mistral LLM, and delivers them to Telegram.
-
-Built as a portfolio project to demonstrate production-style Rust: async I/O, error handling, structured logging, environment-based configuration, and graceful shutdown.
-
----
 
 ## Features
 
@@ -93,17 +88,6 @@ Queries both nodes once, prints a report, and exits with code `0` (OK) or `1` (p
 cargo run -- status
 ```
 
-```
-Опрашиваю ноды...
-  target    http://192.168.1.10:8899              slot=300123456   rtt=42ms
-  reference https://api.mainnet-beta.solana.com   slot=300123460   rtt=118ms
-delta=-4   target_rtt=42ms   статус=OK
-```
-
-```bash
-# Use in a script
-solana-cli-sentinel status || send_oncall_page.sh
-```
 
 ### `watch` — continuous daemon
 
