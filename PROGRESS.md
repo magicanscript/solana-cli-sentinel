@@ -63,10 +63,44 @@ Finished `dev` profile [unoptimized + debuginfo] target(s) in 5.38s
 
 ---
 
-## Фаза 4 — Демон (alert, watch, Ctrl+C) ⏳
-_Ожидает выполнения_
+## Фаза 4 — Демон (watch, Ctrl+C) ✅
+**Дата:** 2026-06-22
+
+### Что сделано
+- `src/commands/watch.rs` — реализация команды `watch`:
+  - Бесконечный цикл: первый тик выполняется немедленно, затем `tokio::select!` между `sleep(poll_interval)` и `ctrl_c()`
+  - Graceful shutdown: Ctrl+C (SIGINT) прерывает сон и завершает процесс с логом
+  - Cooldown: если с последнего алерта прошло меньше `alert_cooldown` — новый алерт подавляется с `warn!`
+  - LLM-фолбэк: при ошибке Mistral API отправляется базовый текст алерта без LLM
+  - Ошибки опроса и Telegram логируются через `tracing::error!`, демон продолжает работу
+- `src/commands/mod.rs` — подключён модуль `watch`, заглушка удалена
+
+### Результат сборки
+```
+Finished `dev` profile [unoptimized + debuginfo] target(s) in 2.64s
+```
+12 unit-тестов пройдено (2 интеграционных — `#[ignore]`). 1 предупреждение (unused field `reference_rtt_ms` — для Фазы 5).
 
 ---
 
-## Фаза 5 — Hardening (tracing, retry, .env.example) ⏳
-_Ожидает выполнения_
+## Фаза 5 — Hardening (tracing, retry, .env.example) ✅
+**Дата:** 2026-06-22
+
+### Что сделано
+- `src/utils/mod.rs` — `retry_async<F, Fut, T, E>`:
+  - Универсальный async-retry с экспоненциальным backoff: 1с → 2с → 4с
+  - До `max_attempts` попыток; при исчерпании — возвращает последнюю ошибку
+  - `warn!` на каждый неудачный промежуточный attempt с меткой операции
+- `src/metrics/mod.rs` — `probe_both` использует `retry_async("target rpc", 3, ...)` и `retry_async("reference rpc", 3, ...)` через `tokio::try_join!`; каждая нода ретраится независимо
+- `src/llm/mod.rs` — HTTP-вызов к Mistral обёрнут в `retry_async("mistral api", 3, ...)`; `reqwest::Client` клонируется дёшево (Arc-based) для `async move`-замыканий
+- `src/notify/mod.rs` — HTTP-вызов к Telegram обёрнут в `retry_async("telegram api", 3, ...)`; аналогичный паттерн
+- `src/main.rs` — улучшена инициализация tracing:
+  - `EnvFilter::try_from_default_env()` с фолбэком на `"info"` (раньше была паника при отсутствии `RUST_LOG`)
+  - `with_target(false)` — убирает путь модуля (`solana_cli_sentinel::metrics`) из каждой строки лога
+- `.env.example` — документированный шаблон всех 10 переменных окружения с примерами и ссылками
+
+### Результат сборки
+```
+Finished `dev` profile [unoptimized + debuginfo] target(s) in 2.57s
+```
+12 unit-тестов пройдено (2 интеграционных — `#[ignore]`). 1 предупреждение (unused field `reference_rtt_ms` в `Analysis` — поле зарезервировано для будущих метрик).

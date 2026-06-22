@@ -14,6 +14,7 @@ use tracing::{debug, error};
 use crate::analysis::Analysis;
 use crate::config::Config;
 use crate::error::SentinelError;
+use crate::utils;
 
 /// HTTP-клиент для Mistral API.
 ///
@@ -62,19 +63,29 @@ impl LlmClient {
             ]
         });
 
-        let response: Value = self
-            .http
-            .post("https://api.mistral.ai/v1/chat/completions")
-            .header("Authorization", format!("Bearer {}", cfg.mistral_api_key))
-            .header("Content-Type", "application/json")
-            .json(&body)
-            .send()
-            .await
-            // reqwest::Error автоматически конвертируется в SentinelError::Http через #[from]
-            .map_err(SentinelError::Http)?
-            .json()
-            .await
-            .map_err(SentinelError::Http)?;
+        // reqwest::Client клонируется дёшево (Arc внутри), строки клонируются
+        // чтобы каждая попытка владела своими данными (async move)
+        let http = self.http.clone();
+        let api_key = cfg.mistral_api_key.clone();
+
+        let response: Value = utils::retry_async("mistral api", 3, || {
+            let http = http.clone();
+            let api_key = api_key.clone();
+            let b = body.clone();
+            async move {
+                http.post("https://api.mistral.ai/v1/chat/completions")
+                    .header("Authorization", format!("Bearer {api_key}"))
+                    .header("Content-Type", "application/json")
+                    .json(&b)
+                    .send()
+                    .await
+                    .map_err(SentinelError::Http)?
+                    .json::<Value>()
+                    .await
+                    .map_err(SentinelError::Http)
+            }
+        })
+        .await?;
 
         // Извлекаем текст из choices[0].message.content
         let text = response["choices"][0]["message"]["content"]

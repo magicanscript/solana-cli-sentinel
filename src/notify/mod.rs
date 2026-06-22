@@ -12,6 +12,7 @@ use tracing::{debug, error};
 
 use crate::config::Config;
 use crate::error::SentinelError;
+use crate::utils;
 
 /// HTTP-клиент для Telegram Bot API.
 ///
@@ -53,16 +54,24 @@ impl TelegramClient {
 
         debug!(chat_id = cfg.telegram_chat_id, "отправляю сообщение в Telegram");
 
-        let response: serde_json::Value = self
-            .http
-            .post(&url)
-            .json(&body)
-            .send()
-            .await
-            .map_err(SentinelError::Http)?
-            .json()
-            .await
-            .map_err(SentinelError::Http)?;
+        let http = self.http.clone();
+
+        let response: serde_json::Value = utils::retry_async("telegram api", 3, || {
+            let http = http.clone();
+            let url = url.clone();
+            let b = body.clone();
+            async move {
+                http.post(url)
+                    .json(&b)
+                    .send()
+                    .await
+                    .map_err(SentinelError::Http)?
+                    .json::<serde_json::Value>()
+                    .await
+                    .map_err(SentinelError::Http)
+            }
+        })
+        .await?;
 
         // Telegram возвращает {"ok": true, ...} при успехе
         // или {"ok": false, "description": "..."} при ошибке

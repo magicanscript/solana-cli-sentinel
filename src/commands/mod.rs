@@ -1,16 +1,10 @@
-/// Реестр CLI-команд приложения.
-///
-/// Текущие команды:
-/// - `status` — разовый опрос нод, вывод в stdout (Фаза 2)
-/// - `watch`  — демон: бесконечный polling loop (реализуется в Фазе 4)
-///
-/// Новые команды добавляются как варианты в `Commands` и ветки в `execute`.
 use anyhow::Result;
 use clap::Subcommand;
 
 use crate::config::Config;
 
 pub mod status;
+pub mod watch;
 
 #[derive(Subcommand)]
 pub enum Commands {
@@ -28,11 +22,6 @@ pub enum Commands {
 pub async fn execute(cmd: Commands, cfg: Config) -> Result<()> {
     match cmd {
         Commands::Status => status::run(cfg).await,
-        // TODO Фаза 4: реализовать commands::watch::run(cfg)
-        Commands::Watch => {
-            println!("Команда 'watch' будет реализована в Фазе 4.");
-            println!("Конфигурация загружена: {}", cfg.summary());
-            Ok(())
-        }
+        Commands::Watch => watch::run(cfg).await,
     }
 }

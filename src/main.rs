@@ -33,9 +33,18 @@ async fn main() -> Result<()> {
     // Загружаем .env если он существует; ok() подавляет ошибку если файл не найден
     dotenv().ok();
 
-    // Инициализируем трейсинг: форматирует логи и читает уровень из RUST_LOG.
-    // Пример запуска с дебаг-логами: RUST_LOG=debug cargo run -- status
-    tracing_subscriber::fmt::init();
+    // Инициализируем трейсинг.
+    // Уровень читается из RUST_LOG; по умолчанию — info.
+    // with_target(false)    — убирает путь модуля из каждой строки лога
+    // with_thread_ids(false) — убирает ID потоков (не нужны для однопоточных сценариев)
+    // Пример: RUST_LOG=debug cargo run -- status
+    tracing_subscriber::fmt()
+        .with_env_filter(
+            tracing_subscriber::EnvFilter::try_from_default_env()
+                .unwrap_or_else(|_| tracing_subscriber::EnvFilter::new("info")),
+        )
+        .with_target(false)
+        .init();
 
     let cli = Cli::parse();
 

@@ -14,6 +14,7 @@ use tracing::debug;
 
 use crate::config::Config;
 use crate::error::SentinelError;
+use crate::utils;
 
 /// Метрики одного опроса одной ноды.
 #[derive(Debug, Clone)]
@@ -65,17 +66,18 @@ pub async fn probe_node(url: &str) -> Result<NodeMetrics, SentinelError> {
     })
 }
 
-/// Параллельно опрашивает обе ноды из конфигурации.
+/// Параллельно опрашивает обе ноды из конфигурации с автоматическим retry.
 ///
-/// `tokio::try_join!` запускает оба `probe_node` одновременно и ждёт обоих.
-/// Суммарное время ≈ max(rtt_target, rtt_reference), а не их сумма.
-///
-/// Если хотя бы одна нода вернёт ошибку — функция немедленно завершается
-/// с этой ошибкой (вторая задача при этом отменяется).
+/// Каждая нода опрашивается независимо с экспоненциальным backoff (до 3 попыток).
+/// `tokio::try_join!` запускает оба retry-цикла одновременно — суммарное время
+/// ≈ max(rtt_target, rtt_reference), а не сумма.
 pub async fn probe_both(cfg: &Config) -> Result<ProbeResult, SentinelError> {
+    let target_url = cfg.target_rpc_url.clone();
+    let reference_url = cfg.reference_rpc_url.clone();
+
     let (target, reference) = tokio::try_join!(
-        probe_node(&cfg.target_rpc_url),
-        probe_node(&cfg.reference_rpc_url),
+        utils::retry_async("target rpc", 3, || probe_node(&target_url)),
+        utils::retry_async("reference rpc", 3, || probe_node(&reference_url)),
     )?;
 
     Ok(ProbeResult { target, reference })
