@@ -7,7 +7,7 @@
 /// Этот модуль намеренно не делает никаких сетевых запросов — только математика
 /// и сравнения. Благодаря этому его легко тестировать без реального Solana-узла.
 use crate::config::Config;
-use crate::metrics::{NodeMetrics, ProbeResult};
+use crate::metrics::ProbeResult;
 
 /// Результат анализа одного цикла опроса.
 ///
@@ -98,6 +98,7 @@ pub fn analyze(probe: &ProbeResult, cfg: &Config) -> Analysis {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::metrics::NodeMetrics;
     use std::time::Duration;
 
     /// Создаёт тестовый Config с заданными порогами.
@@ -110,8 +111,8 @@ mod tests {
             slot_lag_threshold,
             rtt_threshold_ms,
             alert_cooldown: Duration::from_secs(300),
-            anthropic_api_key: "test-key".to_string(),
-            anthropic_model: "claude-sonnet-4-6".to_string(),
+            mistral_api_key: "test-key".to_string(),
+            mistral_model: "mistral-small-latest".to_string(),
             telegram_bot_token: "test-token".to_string(),
             telegram_chat_id: "test-chat".to_string(),
         }

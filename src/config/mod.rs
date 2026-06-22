@@ -43,15 +43,15 @@ pub struct Config {
     /// Предотвращает спам в Telegram при затяжной проблеме.
     pub alert_cooldown: Duration,
 
-    // --- Anthropic LLM ---
+    // --- Mistral LLM ---
 
-    /// Секретный ключ Anthropic API. Обязательное поле.
-    /// Читается из `ANTHROPIC_API_KEY`.
-    pub anthropic_api_key: String,
+    /// Секретный ключ Mistral API. Обязательное поле.
+    /// Читается из `MISTRAL_API_KEY`.
+    pub mistral_api_key: String,
 
     /// ID модели для генерации алертов.
-    /// Читается из `ANTHROPIC_MODEL`, по умолчанию "claude-sonnet-4-6".
-    pub anthropic_model: String,
+    /// Читается из `MISTRAL_MODEL`, по умолчанию "mistral-small-latest".
+    pub mistral_model: String,
 
     // --- Telegram ---
 
@@ -92,10 +92,10 @@ impl Config {
                 parse_u64_var("SENTINEL_ALERT_COOLDOWN_SECS", 300)?,
             ),
 
-            anthropic_api_key: require_var("ANTHROPIC_API_KEY")?,
+            mistral_api_key: require_var("MISTRAL_API_KEY")?,
 
-            anthropic_model: env::var("ANTHROPIC_MODEL")
-                .unwrap_or_else(|_| "claude-sonnet-4-6".to_string()),
+            mistral_model: env::var("MISTRAL_MODEL")
+                .unwrap_or_else(|_| "mistral-small-latest".to_string()),
 
             telegram_bot_token: require_var("TELEGRAM_BOT_TOKEN")?,
 
@@ -114,7 +114,7 @@ impl Config {
             self.slot_lag_threshold,
             self.rtt_threshold_ms,
             self.alert_cooldown,
-            self.anthropic_model,
+            self.mistral_model,
         )
     }
 }
