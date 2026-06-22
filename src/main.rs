@@ -1,12 +1,12 @@
-/// Точка входа в приложение.
+/// Application entry point.
 ///
-/// Порядок инициализации:
-/// 1. Загрузка `.env` через `dotenvy` (если файл существует — игнорирует ошибку)
-/// 2. Инициализация логирования через `tracing_subscriber`
-///    — уровень читается из `RUST_LOG` (например: RUST_LOG=debug)
-/// 3. Разбор CLI-аргументов через `clap`
-/// 4. Чтение конфигурации из env-переменных
-/// 5. Передача управления нужной команде
+/// Initialization order:
+/// 1. Load `.env` via `dotenvy` (silently ignored if the file is absent)
+/// 2. Initialize logging via `tracing_subscriber`
+///    — level is read from `RUST_LOG` (e.g. RUST_LOG=debug)
+/// 3. Parse CLI arguments via `clap`
+/// 4. Read configuration from environment variables
+/// 5. Dispatch to the requested command
 use anyhow::Result;
 use clap::Parser;
 use dotenvy::dotenv;
@@ -15,12 +15,14 @@ mod analysis;
 mod commands;
 mod config;
 mod error;
+mod llm;
 mod metrics;
+mod notify;
 mod utils;
 
 #[derive(Parser)]
 #[command(name = "solana-cli-sentinel")]
-#[command(about = "Демон мониторинга Solana-ноды с AI-алертами в Telegram")]
+#[command(about = "Solana node monitoring daemon with AI-powered Telegram alerts")]
 struct Cli {
     #[command(subcommand)]
     command: commands::Commands,
@@ -28,17 +30,25 @@ struct Cli {
 
 #[tokio::main]
 async fn main() -> Result<()> {
-    // Загружаем .env если он существует; ok() подавляет ошибку если файл не найден
+    // Load .env if it exists; ok() silences the error when the file is missing
     dotenv().ok();
 
-    // Инициализируем трейсинг: форматирует логи и читает уровень из RUST_LOG.
-    // Пример запуска с дебаг-логами: RUST_LOG=debug cargo run -- status
-    tracing_subscriber::fmt::init();
+    // Initialize tracing.
+    // Log level is read from RUST_LOG; defaults to info.
+    // with_target(false) — strips the module path from each log line
+    // Example: RUST_LOG=debug cargo run -- status
+    tracing_subscriber::fmt()
+        .with_env_filter(
+            tracing_subscriber::EnvFilter::try_from_default_env()
+                .unwrap_or_else(|_| tracing_subscriber::EnvFilter::new("info")),
+        )
+        .with_target(false)
+        .init();
 
     let cli = Cli::parse();
 
-    // Читаем конфигурацию один раз здесь и передаём в команду.
-    // Если обязательные env-переменные не заданы — process завершится с ошибкой.
+    // Read configuration once and pass it into the command.
+    // If any required env variable is missing the process exits with an error.
     let cfg = config::Config::from_env()?;
 
     commands::execute(cli.command, cfg).await?;

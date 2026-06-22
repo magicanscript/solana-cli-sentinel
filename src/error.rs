@@ -1,40 +1,39 @@
-/// Центральный тип ошибок всего приложения.
+/// Central error type for the entire application.
 ///
-/// Использует `thiserror` — библиотеку, которая автоматически генерирует
-/// реализации трейтов `Display` и `std::error::Error` через атрибут `#[derive(Error)]`.
+/// Uses `thiserror` which auto-generates `Display` and `std::error::Error`
+/// implementations via the `#[derive(Error)]` attribute.
 ///
-/// Каждый вариант соответствует одному источнику ошибок:
-/// - `Config`  — ошибки при чтении конфигурации из env-переменных
-/// - `Rpc`     — ошибки при обращении к Solana RPC (сеть, таймаут, неверный ответ)
-/// - `Http`    — ошибки HTTP-запросов (reqwest) к Anthropic API и Telegram
-/// - `Llm`     — ошибки парсинга ответа от LLM (неожиданная структура JSON)
-/// - `Telegram`— ошибки отправки сообщения через Telegram Bot API
+/// Each variant maps to one error source:
+/// - `Config`   — errors reading configuration from env variables
+/// - `Rpc`      — errors talking to the Solana RPC (network, timeout, bad response)
+/// - `Http`     — HTTP-level errors (reqwest) for Mistral API and Telegram
+/// - `Llm`      — unexpected LLM response structure (missing JSON fields)
+/// - `Telegram` — Telegram Bot API returned `ok: false`
 use thiserror::Error;
 
 #[derive(Debug, Error)]
 pub enum SentinelError {
-    /// Обязательная env-переменная отсутствует или имеет неверный формат.
-    /// `{0}` — строка с описанием, что именно не так.
-    #[error("Ошибка конфигурации: {0}")]
+    /// A required env variable is missing or has an invalid format.
+    /// `{0}` contains a human-readable description of what is wrong.
+    #[error("Configuration error: {0}")]
     Config(String),
 
-    /// Ошибка при запросе к Solana RPC-ноде.
-    /// `{0}` — сообщение от клиента (адрес, код ошибки и т.д.).
-    #[error("Ошибка RPC: {0}")]
+    /// Error querying a Solana RPC node.
+    /// `{0}` contains the client message (address, error code, etc.).
+    #[error("RPC error: {0}")]
     Rpc(String),
 
-    /// HTTP-уровень: сетевые ошибки, таймауты, TLS.
-    /// `#[from]` означает: Rust автоматически умеет конвертировать `reqwest::Error`
-    /// в `SentinelError::Http` через оператор `?`.
-    #[error("HTTP ошибка: {0}")]
+    /// HTTP-level error: network failures, timeouts, TLS issues.
+    /// `#[from]` lets Rust auto-convert `reqwest::Error` into `SentinelError::Http` via `?`.
+    #[error("HTTP error: {0}")]
     Http(#[from] reqwest::Error),
 
-    /// Ответ LLM пришёл, но структура JSON не соответствует ожидаемой
-    /// (например, отсутствует поле `content[0].text`).
-    #[error("Неожиданный ответ LLM: {0}")]
+    /// The LLM responded but the JSON structure was unexpected
+    /// (e.g. the `choices[0].message.content` field is absent).
+    #[error("Unexpected LLM response: {0}")]
     Llm(String),
 
-    /// Telegram API вернул `ok: false` с описанием причины.
-    #[error("Ошибка Telegram: {0}")]
+    /// Telegram API returned `ok: false` with an error description.
+    #[error("Telegram error: {0}")]
     Telegram(String),
 }

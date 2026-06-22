@@ -1,46 +1,46 @@
-/// Модуль анализа метрик.
+/// Metrics analysis module.
 ///
-/// Содержит единственную публичную функцию `analyze()`, которая принимает
-/// результат опроса двух нод и конфигурацию, и возвращает структурированный
-/// анализ с флагами нарушений.
+/// Contains the single public function `analyze()`, which takes the result of
+/// probing two nodes plus the configuration, and returns a structured analysis
+/// with violation flags.
 ///
-/// Этот модуль намеренно не делает никаких сетевых запросов — только математика
-/// и сравнения. Благодаря этому его легко тестировать без реального Solana-узла.
+/// This module intentionally makes no network requests — only arithmetic and
+/// comparisons. This makes it easy to unit-test without a real Solana node.
 use crate::config::Config;
-use crate::metrics::{NodeMetrics, ProbeResult};
+use crate::metrics::ProbeResult;
 
-/// Результат анализа одного цикла опроса.
+/// Result of analysing one probe cycle.
 ///
-/// Содержит как сырые вычисленные значения (для логирования),
-/// так и булевы флаги (для принятия решения об алерте).
+/// Contains both raw computed values (for logging) and boolean flags
+/// (for deciding whether to send an alert).
 #[derive(Debug, Clone)]
 pub struct Analysis {
-    /// Разница слотов: `target_slot - reference_slot`.
-    /// Отрицательное значение означает, что target-нода отстаёт от эталона.
-    /// Например, -12 значит: наша нода позади эталонной на 12 слотов.
+    /// Slot difference: `target_slot - reference_slot`.
+    /// A negative value means the target node is behind the reference.
+    /// For example, -12 means our node is 12 slots behind the reference.
     pub slot_delta: i64,
 
-    /// RTT запроса к target-ноде в миллисекундах.
+    /// RTT of the request to the target node in milliseconds.
     pub target_rtt_ms: u64,
 
-    /// RTT запроса к reference-ноде в миллисекундах (для контекста).
+    /// RTT of the request to the reference node in milliseconds (for context).
     pub reference_rtt_ms: u64,
 
-    /// `true` если отставание target-ноды превышает порог `slot_lag_threshold`.
-    /// Условие: `slot_delta < -(config.slot_lag_threshold as i64)`
+    /// `true` if the target node's slot lag exceeds `slot_lag_threshold`.
+    /// Condition: `slot_delta < -(config.slot_lag_threshold as i64)`
     pub is_slot_lagging: bool,
 
-    /// `true` если RTT target-ноды превышает порог `rtt_threshold_ms`.
+    /// `true` if the target node's RTT exceeds `rtt_threshold_ms`.
     pub is_rtt_high: bool,
 
-    /// `true` если нужно отправить алерт (хотя бы одно условие нарушено).
+    /// `true` if an alert should be sent (at least one condition is violated).
     /// `needs_alert = is_slot_lagging || is_rtt_high`
     pub needs_alert: bool,
 }
 
 impl Analysis {
-    /// Возвращает человекочитаемое описание проблемы для логирования.
-    /// Если проблем нет — возвращает "OK".
+    /// Returns a human-readable description of the problem for logging.
+    /// Returns "OK" if no problems are detected.
     pub fn status_text(&self) -> String {
         if !self.needs_alert {
             return "OK".to_string();
@@ -56,26 +56,26 @@ impl Analysis {
     }
 }
 
-/// Анализирует результат опроса нод и возвращает структуру `Analysis`.
+/// Analyses the result of a node probe and returns an `Analysis` struct.
 ///
-/// # Аргументы
-/// * `probe` — результат параллельного опроса target и reference нод
-/// * `cfg`   — конфигурация с порогами для сравнения
+/// # Arguments
+/// * `probe` — result of the parallel probe of target and reference nodes
+/// * `cfg`   — configuration with thresholds for comparison
 ///
-/// # Логика
-/// - `slot_delta` = target_slot - reference_slot (может быть отрицательным)
-/// - Нода отстаёт если она за эталоном больше чем на `slot_lag_threshold` слотов
-/// - RTT высокий если он превышает `rtt_threshold_ms`
+/// # Logic
+/// - `slot_delta` = target_slot - reference_slot (can be negative)
+/// - The node is lagging if it is more than `slot_lag_threshold` slots behind the reference
+/// - RTT is high if it exceeds `rtt_threshold_ms`
 pub fn analyze(probe: &ProbeResult, cfg: &Config) -> Analysis {
-    // Вычисляем дельту слотов.
-    // Приводим u64 к i64 чтобы дельта могла быть отрицательной.
+    // Compute slot delta.
+    // Cast u64 to i64 so the delta can be negative.
     let slot_delta = probe.target.slot as i64 - probe.reference.slot as i64;
 
-    // Нода отстаёт если дельта отрицательна И по модулю превышает порог.
-    // Пример: порог=5, дельта=-7 → отстаёт. Дельта=-3 → в норме.
+    // The node is lagging if the delta is negative AND its absolute value exceeds the threshold.
+    // Example: threshold=5, delta=-7 → lagging. delta=-3 → OK.
     let is_slot_lagging = slot_delta < -(cfg.slot_lag_threshold as i64);
 
-    // RTT высокий если превышает настроенный порог в миллисекундах.
+    // RTT is high if it exceeds the configured threshold in milliseconds.
     let is_rtt_high = probe.target.rtt_ms > cfg.rtt_threshold_ms;
 
     Analysis {
@@ -89,19 +89,20 @@ pub fn analyze(probe: &ProbeResult, cfg: &Config) -> Analysis {
 }
 
 // ============================================================================
-// Unit-тесты
+// Unit tests
 // ============================================================================
 //
-// Запуск: cargo test
-// Запуск конкретного теста: cargo test analysis::tests::test_no_alert
+// Run all: cargo test
+// Run one: cargo test analysis::tests::test_no_alert
 
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::metrics::NodeMetrics;
     use std::time::Duration;
 
-    /// Создаёт тестовый Config с заданными порогами.
-    /// Поля API-ключей заполнены заглушками — в тестах они не используются.
+    /// Creates a test Config with the given thresholds.
+    /// API key fields are stubs — not used in these tests.
     fn make_config(slot_lag_threshold: u64, rtt_threshold_ms: u64) -> Config {
         Config {
             target_rpc_url: "http://localhost:8899".to_string(),
@@ -110,14 +111,14 @@ mod tests {
             slot_lag_threshold,
             rtt_threshold_ms,
             alert_cooldown: Duration::from_secs(300),
-            anthropic_api_key: "test-key".to_string(),
-            anthropic_model: "claude-sonnet-4-6".to_string(),
+            mistral_api_key: "test-key".to_string(),
+            mistral_model: "mistral-small-latest".to_string(),
             telegram_bot_token: "test-token".to_string(),
             telegram_chat_id: "test-chat".to_string(),
         }
     }
 
-    /// Создаёт тестовый ProbeResult с заданными значениями слотов и RTT.
+    /// Creates a test ProbeResult with the given slot and RTT values.
     fn make_probe(target_slot: u64, target_rtt_ms: u64, reference_slot: u64) -> ProbeResult {
         ProbeResult {
             target: NodeMetrics {
@@ -127,7 +128,7 @@ mod tests {
             },
             reference: NodeMetrics {
                 slot: reference_slot,
-                rtt_ms: 50, // RTT эталонной ноды не влияет на логику алертов
+                rtt_ms: 50, // reference RTT does not affect alert logic
                 node_url: "https://api.mainnet-beta.solana.com".to_string(),
             },
         }
@@ -135,7 +136,7 @@ mod tests {
 
     #[test]
     fn test_no_alert_when_everything_is_fine() {
-        // Нода не отстаёт (delta = -3, порог = 5), RTT в норме (200ms < 500ms)
+        // Node is not lagging (delta = -3, threshold = 5), RTT is OK (200ms < 500ms)
         let cfg = make_config(5, 500);
         let probe = make_probe(100_000 - 3, 200, 100_000);
         let analysis = analyze(&probe, &cfg);
@@ -148,7 +149,7 @@ mod tests {
 
     #[test]
     fn test_alert_when_slot_lagging() {
-        // Нода отстаёт на 10 слотов при пороге 5 → алерт
+        // Node is 10 slots behind with a threshold of 5 → alert
         let cfg = make_config(5, 500);
         let probe = make_probe(100_000 - 10, 200, 100_000);
         let analysis = analyze(&probe, &cfg);
@@ -161,7 +162,7 @@ mod tests {
 
     #[test]
     fn test_alert_when_rtt_high() {
-        // RTT = 800ms при пороге 500ms → алерт, слоты в норме
+        // RTT = 800ms with a threshold of 500ms → alert, slots are OK
         let cfg = make_config(5, 500);
         let probe = make_probe(100_000, 800, 100_000);
         let analysis = analyze(&probe, &cfg);
@@ -173,7 +174,7 @@ mod tests {
 
     #[test]
     fn test_alert_when_both_conditions_violated() {
-        // И отставание слотов И высокий RTT одновременно
+        // Both slot lag AND high RTT at the same time
         let cfg = make_config(5, 500);
         let probe = make_probe(100_000 - 20, 1200, 100_000);
         let analysis = analyze(&probe, &cfg);
@@ -185,21 +186,21 @@ mod tests {
 
     #[test]
     fn test_no_alert_at_exact_threshold() {
-        // delta = -5 при пороге 5: NOT lagging (строгое неравенство: < -5)
+        // delta = -5 with threshold 5: NOT lagging (strict inequality: < -5)
         let cfg = make_config(5, 500);
         let probe = make_probe(100_000 - 5, 500, 100_000);
         let analysis = analyze(&probe, &cfg);
 
-        // slot_delta = -5, порог = 5: условие slot_delta < -5 → false
+        // slot_delta = -5, threshold = 5: condition slot_delta < -5 → false
         assert!(!analysis.is_slot_lagging);
-        // rtt = 500, порог = 500: условие rtt > 500 → false
+        // rtt = 500, threshold = 500: condition rtt > 500 → false
         assert!(!analysis.is_rtt_high);
         assert!(!analysis.needs_alert);
     }
 
     #[test]
     fn test_target_ahead_of_reference() {
-        // target опережает reference (положительная дельта) — это нормально
+        // target is ahead of reference (positive delta) — this is normal
         let cfg = make_config(5, 500);
         let probe = make_probe(100_010, 100, 100_000);
         let analysis = analyze(&probe, &cfg);
