@@ -19,17 +19,11 @@ clap = { version = "4.5", features = ["derive"] }
 anyhow = "1.0"
 dotenvy = "0.15"
 
-# Типизированные ошибки с автоматической реализацией Display/Error через derive-макросы
 thiserror = "1.0"
 
-# Структурированное логирование: трейты и макросы (info!, warn!, error!, debug!)
 tracing = "0.1"
-
-# Подписчик для tracing: форматирует и выводит логи; читает уровень из RUST_LOG
 tracing-subscriber = { version = "0.3", features = ["env-filter"] }
 
-# Работа с датой/временем; нужен для хранения времени последнего алерта (cooldown)
 chrono = { version = "0.4", features = ["serde"] }
 
-# Парсинг human-readable длительностей: "10s", "5m" из env-переменных
 humantime = "2.1"

@@ -1,4 +1,4 @@
 /target
 .env
 secret.txt
-secrets.txt
+/docs
