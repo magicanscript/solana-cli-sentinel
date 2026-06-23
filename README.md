@@ -96,14 +96,6 @@ Polls nodes on the configured interval, sends Telegram alerts when thresholds ar
 ```bash
 cargo run -- watch
 ```
-
-```
-2026-06-22T14:00:00Z INFO  daemon started: target=http://... interval=10s ...
-2026-06-22T14:00:00Z INFO  tick: delta=-3 target_rtt=45ms status=OK
-2026-06-22T14:00:10Z INFO  tick: delta=-12 target_rtt=45ms status=отставание слотов: -12 ...
-2026-06-22T14:00:10Z INFO  alert sent: Срочно: нода отстаёт на 12 слотов...
-```
-
 **Debug logging:**
 
 ```bash
