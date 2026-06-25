@@ -14,7 +14,6 @@ use crate::error::SentinelError;
 #[derive(Debug, Clone)]
 pub struct Config {
     // --- Solana RPC ---
-
     /// URL of the node being monitored (required).
     /// Example: "http://192.168.1.10:8899"
     pub target_rpc_url: String,
@@ -24,13 +23,11 @@ pub struct Config {
     pub reference_rpc_url: String,
 
     // --- Polling parameters ---
-
     /// Interval between node polls.
     /// Read from `SENTINEL_POLL_INTERVAL_SECS`, default 10 seconds.
     pub poll_interval: Duration,
 
     // --- Alert thresholds ---
-
     /// Maximum allowed slot lag of the target node behind the reference.
     /// If `reference_slot - target_slot > slot_lag_threshold` → alert.
     pub slot_lag_threshold: u64,
@@ -43,18 +40,16 @@ pub struct Config {
     /// Prevents Telegram spam during a prolonged incident.
     pub alert_cooldown: Duration,
 
-    // --- Mistral LLM ---
+    // --- LLM ---
+    /// API ключ для генерации текста. Обязательное поле.
+    /// Читается из `LLM_API_KEY`.
+    pub llm_api_key: String,
 
-    /// Mistral API secret key. Required.
-    /// Read from `MISTRAL_API_KEY`.
-    pub mistral_api_key: String,
-
-    /// Model ID used for alert generation.
-    /// Read from `MISTRAL_MODEL`, default "mistral-small-latest".
-    pub mistral_model: String,
+    /// Модель для генерации текста.
+    /// Читается из `LLM_MODEL`, по умолчанию "mistral-small-latest".
+    pub llm_model: String,
 
     // --- Telegram ---
-
     /// Telegram bot token (format: "123456:ABC-DEF..."). Required.
     pub telegram_bot_token: String,
 
@@ -80,22 +75,20 @@ impl Config {
             reference_rpc_url: env::var("SOLANA_REFERENCE_RPC_URL")
                 .unwrap_or_else(|_| "https://api.mainnet-beta.solana.com".to_string()),
 
-            poll_interval: Duration::from_secs(
-                parse_u64_var("SENTINEL_POLL_INTERVAL_SECS", 10)?,
-            ),
+            poll_interval: Duration::from_secs(parse_u64_var("SENTINEL_POLL_INTERVAL_SECS", 10)?),
 
             slot_lag_threshold: parse_u64_var("SENTINEL_SLOT_LAG_THRESHOLD", 5)?,
 
             rtt_threshold_ms: parse_u64_var("SENTINEL_RTT_THRESHOLD_MS", 500)?,
 
-            alert_cooldown: Duration::from_secs(
-                parse_u64_var("SENTINEL_ALERT_COOLDOWN_SECS", 300)?,
-            ),
+            alert_cooldown: Duration::from_secs(parse_u64_var(
+                "SENTINEL_ALERT_COOLDOWN_SECS",
+                300,
+            )?),
 
-            mistral_api_key: require_var("MISTRAL_API_KEY")?,
+            llm_api_key: require_var("LLM_API_KEY")?,
 
-            mistral_model: env::var("MISTRAL_MODEL")
-                .unwrap_or_else(|_| "mistral-small-latest".to_string()),
+            llm_model: env::var("LLM_MODEL").unwrap_or_else(|_| "mistral-small-latest".to_string()),
 
             telegram_bot_token: require_var("TELEGRAM_BOT_TOKEN")?,
 
@@ -114,7 +107,7 @@ impl Config {
             self.slot_lag_threshold,
             self.rtt_threshold_ms,
             self.alert_cooldown,
-            self.mistral_model,
+            self.llm_model,
         )
     }
 }

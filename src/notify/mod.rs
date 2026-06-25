@@ -52,7 +52,10 @@ impl TelegramClient {
             "parse_mode": "HTML"
         });
 
-        debug!(chat_id = cfg.telegram_chat_id, "sending message to Telegram");
+        debug!(
+            chat_id = cfg.telegram_chat_id,
+            "sending message to Telegram"
+        );
 
         let http = self.http.clone();
 
@@ -80,7 +83,11 @@ impl TelegramClient {
                 .as_str()
                 .unwrap_or("unknown error")
                 .to_string();
-            error!(chat_id = cfg.telegram_chat_id, error = description, "failed to send Telegram message");
+            error!(
+                chat_id = cfg.telegram_chat_id,
+                error = description,
+                "failed to send Telegram message"
+            );
             return Err(SentinelError::Telegram(description));
         }
 
@@ -113,12 +120,11 @@ mod tests {
             slot_lag_threshold: 5,
             rtt_threshold_ms: 500,
             alert_cooldown: Duration::from_secs(300),
-            mistral_api_key: "placeholder".to_string(),
-            mistral_model: "mistral-small-latest".to_string(),
+            llm_api_key: "placeholder".to_string(),
+            llm_model: "mistral-small-latest".to_string(),
             telegram_bot_token: std::env::var("TELEGRAM_BOT_TOKEN")
                 .expect("TELEGRAM_BOT_TOKEN не задан"),
-            telegram_chat_id: std::env::var("TELEGRAM_CHAT_ID")
-                .expect("TELEGRAM_CHAT_ID не задан"),
+            telegram_chat_id: std::env::var("TELEGRAM_CHAT_ID").expect("TELEGRAM_CHAT_ID не задан"),
         };
 
         let client = TelegramClient::new();

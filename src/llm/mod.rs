@@ -8,7 +8,7 @@
 /// The prompt passes raw numbers (URL, slot delta, RTT, thresholds) to the LLM
 /// and requests a concise technical alert ≤ 200 characters, plain text, no markdown.
 use reqwest::Client;
-use serde_json::{json, Value};
+use serde_json::{Value, json};
 use tracing::{debug, error};
 
 use crate::analysis::Analysis;
@@ -53,10 +53,10 @@ impl LlmClient {
     ) -> Result<String, SentinelError> {
         let prompt = build_prompt(target_url, analysis, cfg);
 
-        debug!(model = cfg.mistral_model, "sending request to Mistral API");
+        debug!(model = cfg.llm_model, "sending request to Mistral API");
 
         let body = json!({
-            "model": cfg.mistral_model,
+            "model": cfg.llm_model,
             "max_tokens": 256,
             "messages": [
                 { "role": "user", "content": prompt }
@@ -66,7 +66,7 @@ impl LlmClient {
         // reqwest::Client is cheaply cloneable (Arc-based); strings are cloned
         // so each retry attempt owns its data (async move closures)
         let http = self.http.clone();
-        let api_key = cfg.mistral_api_key.clone();
+        let api_key = cfg.llm_api_key.clone();
 
         let response: Value = utils::retry_async("mistral api", 3, || {
             let http = http.clone();
@@ -152,8 +152,8 @@ mod tests {
             slot_lag_threshold: 5,
             rtt_threshold_ms: 500,
             alert_cooldown: Duration::from_secs(300),
-            mistral_api_key: "test-key".to_string(),
-            mistral_model: "mistral-small-latest".to_string(),
+            llm_api_key: "test-key".to_string(),
+            llm_model: "mistral-small-latest".to_string(),
             telegram_bot_token: "test-token".to_string(),
             telegram_chat_id: "test-chat".to_string(),
         }
@@ -219,8 +219,8 @@ mod tests {
             slot_lag_threshold: 5,
             rtt_threshold_ms: 500,
             alert_cooldown: Duration::from_secs(300),
-            mistral_api_key: std::env::var("MISTRAL_API_KEY").expect("MISTRAL_API_KEY не задан"),
-            mistral_model: std::env::var("MISTRAL_MODEL")
+            llm_api_key: std::env::var("LLM_API_KEY").expect("LLM_API_KEY не задан"),
+            llm_model: std::env::var("LLM_MODEL")
                 .unwrap_or_else(|_| "mistral-small-latest".to_string()),
             telegram_bot_token: "placeholder".to_string(),
             telegram_chat_id: "placeholder".to_string(),
@@ -235,6 +235,10 @@ mod tests {
 
         println!("Сгенерированный алерт:\n{text}");
         assert!(!text.is_empty(), "алерт не должен быть пустым");
-        assert!(text.len() <= 300, "алерт слишком длинный: {} символов", text.len());
+        assert!(
+            text.len() <= 300,
+            "алерт слишком длинный: {} символов",
+            text.len()
+        );
     }
 }

@@ -47,10 +47,16 @@ impl Analysis {
         }
         let mut parts = Vec::new();
         if self.is_slot_lagging {
-            parts.push(format!("отставание слотов: {} (порог: нарушен)", self.slot_delta));
+            parts.push(format!(
+                "отставание слотов: {} (порог: нарушен)",
+                self.slot_delta
+            ));
         }
         if self.is_rtt_high {
-            parts.push(format!("высокий RTT: {}ms", self.target_rtt_ms));
+            parts.push(format!(
+                "высокий RTT: {}ms (ref: {}ms)",
+                self.target_rtt_ms, self.reference_rtt_ms
+            ));
         }
         parts.join(", ")
     }
@@ -111,8 +117,8 @@ mod tests {
             slot_lag_threshold,
             rtt_threshold_ms,
             alert_cooldown: Duration::from_secs(300),
-            mistral_api_key: "test-key".to_string(),
-            mistral_model: "mistral-small-latest".to_string(),
+            llm_api_key: "test-key".to_string(),
+            llm_model: "mistral-small-latest".to_string(),
             telegram_bot_token: "test-token".to_string(),
             telegram_chat_id: "test-chat".to_string(),
         }
