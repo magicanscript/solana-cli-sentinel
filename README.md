@@ -1,4 +1,4 @@
-# solana-cli-sentinel
+# magican-cli-sentinel
 
 ![Rust](https://img.shields.io/badge/Rust-2024_edition-orange?logo=rust)
 ![Solana](https://img.shields.io/badge/Solana-mainnet--beta-9945FF?logo=solana)
